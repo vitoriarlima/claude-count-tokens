@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Token Usage</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Space Mono", ui-monospace, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 60px 24px;
+      transition: background 0.3s ease, color 0.3s ease;
+      background: #f5f4f0;
+      color: #1a1a2e;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #0d0b14;
+        color: #e8e4f0;
+      }
+    }
+
+    .dashboard {
+      width: 100%;
+      max-width: 960px;
+    }
+
+    .dashboard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+
+    .dashboard-title {
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      opacity: 0.6;
+    }
+
+    .dashboard-live {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      opacity: 0.5;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid rgba(128, 128, 128, 0.2);
+      border-radius: 8px;
+      padding: 7px 9px;
+      cursor: pointer;
+      line-height: 0;
+      transition: border-color 0.2s;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .theme-toggle:hover {
+      border-color: rgba(128, 128, 128, 0.4);
+    }
+
+    .theme-toggle svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.6;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="dashboard-header">
+      <span class="dashboard-title">claude code tokens</span>
+      <div class="controls">
+        <div class="dashboard-live">
+          <div class="live-dot"></div>
+          live
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">
+          <!-- Moon icon (light mode default) -->
+          <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <!-- Sun icon (shown in dark mode) -->
+          <svg id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <claude-token-heatmap id="heatmap" src="/api/data"></claude-token-heatmap>
+
+    <div class="palette-picker" id="palette-picker">
+      <div class="palette-label">pick a palette</div>
+      <div class="palette-list" id="palette-list"></div>
+    </div>
+  </div>
+
+  <style>
+    .palette-picker {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(128,128,128,0.15);
+    }
+    .palette-label {
+      font-size: 11px;
+      opacity: 0.4;
+      margin-bottom: 12px;
+    }
+    .palette-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .palette-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .palette-row:hover {
+      background: rgba(128,128,128,0.08);
+    }
+    .palette-row.active {
+      background: rgba(128,128,128,0.12);
+    }
+    .palette-swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .palette-name {
+      font-size: 11px;
+      opacity: 0.5;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+  </style>
+
+  <script src="/widget/claude-token-heatmap.js"></script>
+  <script>
+    // Palettes — leafy pastel greens
+    const palettes = [
+      { name: 'fern',        colors: ['#dbe8d0', '#b6d4a0', '#8bba76', '#629e4e'] },
+      { name: 'sage',        colors: ['#dce5d4', '#bccfab', '#96b882', '#6f9e5c'] },
+      { name: 'moss',        colors: ['#d5e0cd', '#aec9a0', '#87b074', '#5f964c'] },
+      { name: 'mint',        colors: ['#d2ead8', '#a8d4b4', '#7dbd90', '#54a46c'] },
+      { name: 'spring',      colors: ['#dbebc7', '#b8d69a', '#90c06c', '#68a844'] },
+      { name: 'eucalyptus',  colors: ['#d8e5d2', '#b4cdaa', '#8fb682', '#6b9d5c'] },
+      { name: 'pistachio',   colors: ['#e0e8c8', '#c4d4a0', '#a4bd78', '#82a454'] },
+      { name: 'clover',      colors: ['#d0e4d0', '#a6cca6', '#7cb47c', '#559c55'] },
+      { name: 'jade',        colors: ['#cce5d8', '#99ccb4', '#66b290', '#3d996e'] },
+      { name: 'matcha',      colors: ['#d4e4c8', '#b5cda3', '#94b47e', '#6e9a56'] },
+      { name: 'tea',         colors: ['#dde4c4', '#c0cea0', '#9eb87a', '#7ca054'] },
+      { name: 'basil',       colors: ['#d0dece', '#a4c0a0', '#78a474', '#50884c'] },
+    ];
+
+    const listEl = document.getElementById('palette-list');
+    palettes.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'palette-row' + (p.name === 'matcha' ? ' active' : '');
+      row.innerHTML = p.colors.map(c => `<div class="palette-swatch" style="background:${c}"></div>`).join('') +
+        `<span class="palette-name">${p.name}</span>`;
+      row.addEventListener('click', () => {
+        document.querySelectorAll('.palette-row').forEach(r => r.classList.remove('active'));
+        row.classList.add('active');
+        const hm = document.getElementById('heatmap');
+        const root = hm.shadowRoot.querySelector(':host') || hm;
+        // Apply via CSS custom properties on the host element
+        hm.style.setProperty('--cth-cell-l1', p.colors[0]);
+        hm.style.setProperty('--cth-cell-l2', p.colors[1]);
+        hm.style.setProperty('--cth-cell-l3', p.colors[2]);
+        hm.style.setProperty('--cth-cell-l4', p.colors[3]);
+        hm.style.setProperty('--cth-bar-color', p.colors[1]);
+        hm.style.setProperty('--cth-bar-hover', p.colors[3]);
+        hm.style.setProperty('--cth-year-active-bg', p.colors[2]);
+      });
+      listEl.appendChild(row);
+    });
+
+    // SSE: listen for live updates
+    const events = new EventSource('/api/events');
+    events.onmessage = (e) => {
+      if (e.data === 'updated') {
+        fetch('/api/data')
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('heatmap').tokenData = data;
+          });
+      }
+    };
+
+    // Theme toggle
+    let forcedTheme = null;
+
+    function toggleTheme() {
+      const heatmap = document.getElementById('heatmap');
+      const moon = document.getElementById('icon-moon');
+      const sun = document.getElementById('icon-sun');
+
+      if (!forcedTheme) {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        forcedTheme = isDark ? 'light' : 'dark';
+      } else {
+        forcedTheme = forcedTheme === 'dark' ? 'light' : 'dark';
+      }
+
+      heatmap.setAttribute('theme', forcedTheme);
+      document.body.style.background = forcedTheme === 'dark' ? '#0d0b14' : '#f5f4f0';
+      document.body.style.color = forcedTheme === 'dark' ? '#e8e4f0' : '#1a1a2e';
+
+      if (forcedTheme === 'dark') {
+        moon.style.display = 'none';
+        sun.style.display = 'block';
+      } else {
+        moon.style.display = 'block';
+        sun.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

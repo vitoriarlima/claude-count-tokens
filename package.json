@@ -1,0 +1,40 @@
+{
+  "name": "claude-count-tokens",
+  "version": "1.0.0",
+  "description": "GitHub-style heatmap widget showing your Claude Code token usage. One command to run, one line to embed.",
+  "type": "module",
+  "bin": {
+    "claude-count-tokens": "./server/index.js"
+  },
+  "exports": {
+    "./widget": "./widget/claude-token-heatmap.js",
+    ".": "./server/index.js"
+  },
+  "files": [
+    "server/",
+    "widget/",
+    "index.html"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "tokens",
+    "heatmap",
+    "web-component",
+    "usage",
+    "widget",
+    "analytics",
+    "dashboard",
+    "contribution-graph"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/contexere/claude-count-tokens.git"
+  },
+  "homepage": "https://github.com/contexere/claude-count-tokens#readme",
+  "author": "Contexere",
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
