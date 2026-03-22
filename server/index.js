@@ -13,7 +13,7 @@ const ROOT = join(__dirname, '..');
 
 // Parse CLI args
 const args = process.argv.slice(2);
-const isExport = args[0] === 'export';
+const command = args[0];
 
 function getArg(flag, defaultValue) {
   const idx = args.indexOf(flag);
@@ -21,10 +21,49 @@ function getArg(flag, defaultValue) {
   return args[idx + 1] || defaultValue;
 }
 
+function hasFlag(flag) {
+  return args.includes(flag);
+}
+
 const port = parseInt(getArg('--port', '7890'), 10);
 const days = parseInt(getArg('--days', '3650'), 10); // 10 years — parse all available data
 const projectsDir = getArg('--projects-dir', null);
 const projectFilter = getArg('--project', null);
+
+// --- Login / Logout ---
+if (command === 'login') {
+  const { login } = await import('./auth.js');
+  await login();
+  process.exit(0);
+}
+
+if (command === 'logout') {
+  const { logout } = await import('./auth.js');
+  await logout();
+  process.exit(0);
+}
+
+// --- Sync ---
+if (command === 'sync') {
+  if (hasFlag('--install')) {
+    const { installDaemon } = await import('./daemon.js');
+    await installDaemon();
+    process.exit(0);
+  }
+  if (hasFlag('--uninstall')) {
+    const { uninstallDaemon } = await import('./daemon.js');
+    await uninstallDaemon();
+    process.exit(0);
+  }
+  if (hasFlag('--status')) {
+    const { statusDaemon } = await import('./daemon.js');
+    await statusDaemon();
+    process.exit(0);
+  }
+  const { sync } = await import('./sync.js');
+  await sync({ days, projectsDir, projectFilter });
+  process.exit(0);
+}
 
 // --- State ---
 let currentData = null;
@@ -40,7 +79,7 @@ async function refreshData() {
 }
 
 // --- Export mode ---
-if (isExport) {
+if (command === 'export') {
   const outputPath = getArg('-o', getArg('--output', './claude-token-data.json'));
   await refreshData();
   await writeFile(outputPath, JSON.stringify(currentData, null, 2));

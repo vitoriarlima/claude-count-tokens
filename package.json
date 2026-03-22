@@ -1,6 +1,6 @@
 {
   "name": "claude-count-tokens",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "GitHub-style heatmap widget showing your Claude Code token usage. One command to run, one line to embed.",
   "type": "module",
   "bin": {
@@ -13,6 +13,7 @@
   "files": [
     "server/",
     "widget/",
+    "supabase/",
     "index.html"
   ],
   "keywords": [

@@ -6,7 +6,10 @@
  */
 
 class ClaudeTokenHeatmap extends HTMLElement {
-  static get observedAttributes() { return ['src', 'theme', 'locale', 'palette']; }
+  // Supabase Storage public URL — replace with your project's URL
+  static SUPABASE_STORAGE_URL = 'https://huppfkdgepvwvucrjdaa.supabase.co/storage/v1/object/public/token-data';
+
+  static get observedAttributes() { return ['src', 'user', 'theme', 'locale', 'palette']; }
 
   static PALETTES = {
     fern:        ['#dbe8d0', '#b6d4a0', '#8bba76', '#629e4e'],
@@ -32,8 +35,14 @@ class ClaudeTokenHeatmap extends HTMLElement {
 
   connectedCallback() {
     this._render();
-    if (this.getAttribute('palette')) this._applyPalette(this.getAttribute('palette'));
-    if (this.getAttribute('src')) this._fetchData(this.getAttribute('src'));
+    this._applyPalette(this.getAttribute('palette') || 'spring');
+    // user attribute takes precedence — fetches from Supabase Storage
+    if (this.getAttribute('user')) {
+      const user = this.getAttribute('user');
+      this._fetchData(`${ClaudeTokenHeatmap.SUPABASE_STORAGE_URL}/${user}.json`);
+    } else if (this.getAttribute('src')) {
+      this._fetchData(this.getAttribute('src'));
+    }
     this._watchHostTheme();
   }
 
@@ -73,9 +82,15 @@ class ClaudeTokenHeatmap extends HTMLElement {
   }
 
   attributeChangedCallback(name, oldVal, newVal) {
-    if (name === 'src' && newVal && newVal !== oldVal) this._fetchData(newVal);
-    else if (name === 'palette') this._applyPalette(newVal);
-    else if (this._data) this._renderWithData();
+    if (name === 'user' && newVal && newVal !== oldVal) {
+      this._fetchData(`${ClaudeTokenHeatmap.SUPABASE_STORAGE_URL}/${newVal}.json`);
+    } else if (name === 'src' && newVal && newVal !== oldVal) {
+      this._fetchData(newVal);
+    } else if (name === 'palette') {
+      this._applyPalette(newVal);
+    } else if (this._data) {
+      this._renderWithData();
+    }
   }
 
   _applyPalette(name) {

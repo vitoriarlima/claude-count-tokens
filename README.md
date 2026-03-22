@@ -1,43 +1,121 @@
 # claude-count-tokens
 
-A GitHub-style contribution heatmap for your Claude Code token usage. Add it to your personal website in two steps.
+A GitHub-style contribution heatmap for your Claude Code token usage. Add it to your website — it stays up to date automatically.
 
-## Add to your website
-
-### 1. Generate your data
-
-```bash
-npx claude-count-tokens export
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Your Claude Code Token Usage                        2026   │
+│                                                             │
+│  Mon  ░░▒▒░░▓▓░░▒▒░░██▒▒░░▓▓░░▒▒░░██░░▒▒░░▓▓░░▒▒░░██░░  │
+│  Wed  ▒▒░░▓▓░░██░░▒▒░░▓▓░░██▒▒░░▓▓░░▒▒░░██░░▒▒░░▓▓░░██  │
+│  Fri  ░░██▒▒░░▓▓░░▒▒░░██▒▒░░▓▓░░▒▒░░██░░▓▓░░▒▒░░██░░▒▒  │
+│                                                             │
+│  Less ░░▒▒▓▓██ More                        1.2M tokens      │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-This reads your local Claude Code logs and creates a `claude-token-data.json` file. Copy it into your website's public/static folder.
+## Quick start
 
-### 2. Add two lines to your HTML
+Three commands, then you're done forever:
+
+```bash
+npx claude-count-tokens login              # 1. log in with GitHub
+npx claude-count-tokens sync               # 2. upload your token data
+npx claude-count-tokens sync --install     # 3. auto-sync every hour
+```
+
+Then add two lines to your website:
 
 ```html
 <script src="https://unpkg.com/claude-count-tokens/widget/claude-token-heatmap.js"></script>
-<claude-token-heatmap src="./claude-token-data.json"></claude-token-heatmap>
+<claude-token-heatmap user="YOUR_GITHUB_USERNAME" palette="spring">
 ```
 
-Done. No build step, no dependencies, no framework required. Works with any static site, Next.js, Astro, Hugo, Jekyll, plain HTML — anything.
+That's it. Your heatmap stays up to date automatically.
 
-### Updating your data
+## How it works
 
-Re-run the export whenever you want your widget to reflect recent usage:
+```
+  Your Mac                          Cloud                        Your Website
+ ┌────────────────┐            ┌──────────────┐             ┌──────────────────┐
+ │                │   sync     │              │   fetch      │                  │
+ │  Claude Code   │ ────────>  │   Supabase   │ <────────── │  <claude-token-  │
+ │  local logs    │  (hourly)  │   Storage    │  (on load)   │   heatmap>       │
+ │                │            │              │             │                  │
+ │  ~/.claude/    │            │  yourname    │             │  Renders the     │
+ │  projects/     │            │  .json       │             │  heatmap widget  │
+ │                │            │              │             │                  │
+ └────────────────┘            └──────────────┘             └──────────────────┘
+        │                                                           │
+        │  launchd runs                                             │
+        │  sync every hour                                          │
+        └── automatically ─────────────────────────────────────────>│
+                                keeps your widget up to date
+```
+
+1. **Login** — authenticates you via GitHub so we know your username
+2. **Sync** — reads your local Claude Code logs, aggregates token counts, uploads the result as a small JSON file
+3. **Auto-sync** — a background job on your Mac re-syncs every hour so your widget is always current
+4. **Widget** — a self-contained web component that fetches your JSON and renders the heatmap
+
+No data leaves your machine except the aggregated token counts (no prompts, no code, no conversation content).
+
+## Step-by-step setup
+
+### 1. Log in
 
 ```bash
-npx claude-count-tokens export -o ./public/claude-token-data.json
+npx claude-count-tokens login
 ```
 
-To automate it, add a cron job or a pre-deploy script:
+This opens your browser for GitHub login. Once authenticated, you'll see:
+
+```
+Opening browser for GitHub login...
+✓ Logged in as vitoria
+
+Your widget embed:
+  <claude-token-heatmap user="vitoria" palette="spring">
+```
+
+### 2. Sync your data
 
 ```bash
-# crontab -e — update daily at 2am
-0 2 * * * npx claude-count-tokens export -o /path/to/site/claude-token-data.json
-
-# or in your deploy script / CI
-npx claude-count-tokens export -o public/claude-token-data.json && npm run build
+npx claude-count-tokens sync
 ```
+
+```
+  Parsing local Claude Code logs...
+  Found 1.2M tokens across 84 days
+  Uploading to cloud...
+
+  ✓ Synced to cloud. Widget is live.
+```
+
+### 3. Set up auto-sync (recommended)
+
+```bash
+npx claude-count-tokens sync --install
+```
+
+This installs a background job that syncs every hour. You never have to think about it again.
+
+```
+  ✓ Installed background sync (runs every hour)
+  Logs: ~/.claude-count-tokens/sync.log
+  To uninstall: npx claude-count-tokens sync --uninstall
+```
+
+### 4. Add the widget to your site
+
+Add these two lines anywhere in your HTML:
+
+```html
+<script src="https://unpkg.com/claude-count-tokens/widget/claude-token-heatmap.js"></script>
+<claude-token-heatmap user="YOUR_GITHUB_USERNAME" palette="spring">
+```
+
+Works with any site — plain HTML, Next.js, Astro, Hugo, Jekyll, WordPress, anything. No build step, no dependencies, no framework required.
 
 ## Dark mode
 
@@ -48,19 +126,17 @@ It detects dark mode from:
 - `class="dark"` on `<html>` or `<body>`
 - `data-theme="dark"` on `<html>` or `<body>`
 
-If your site has a dark mode toggle, the widget will switch with it.
-
 To force a specific theme:
 ```html
-<claude-token-heatmap src="./data.json" theme="dark"></claude-token-heatmap>
+<claude-token-heatmap user="vitoria" theme="dark"></claude-token-heatmap>
 ```
 
 ## Color palettes
 
-Pick a color palette with a single attribute:
+The default palette is **spring**. To pick a different one, add a `palette` attribute:
 
 ```html
-<claude-token-heatmap src="./data.json" palette="spring"></claude-token-heatmap>
+<claude-token-heatmap user="vitoria" palette="mint"></claude-token-heatmap>
 ```
 
 Available palettes:
@@ -80,7 +156,7 @@ claude-token-heatmap {
 
 ## Live dashboard
 
-If you just want to see your own usage locally while you code:
+Want to see your usage locally while you code?
 
 ```bash
 npx claude-count-tokens
@@ -93,9 +169,18 @@ Opens a live dashboard at `http://localhost:7890` that updates in real-time as y
 ```
 npx claude-count-tokens                     # live dashboard on port 7890
 npx claude-count-tokens --port 3000         # custom port
-npx claude-count-tokens export              # export to ./claude-token-data.json
-npx claude-count-tokens export -o data.json # custom output path
 npx claude-count-tokens --days 90           # last 90 days only
+
+npx claude-count-tokens login               # log in with GitHub
+npx claude-count-tokens logout              # log out, clear credentials
+
+npx claude-count-tokens sync               # upload token data to cloud
+npx claude-count-tokens sync --install     # auto-sync every hour (macOS)
+npx claude-count-tokens sync --uninstall   # remove auto-sync
+npx claude-count-tokens sync --status      # check if auto-sync is running
+
+npx claude-count-tokens export             # export to ./claude-token-data.json
+npx claude-count-tokens export -o out.json # custom output path
 ```
 
 ## What gets counted
@@ -109,26 +194,17 @@ The widget reads local JSONL logs that Claude Code writes at `~/.claude/projects
 | Cache write | tokens written to context cache |
 | Cache read | tokens read from context cache |
 
-For older Claude Code versions that didn't record token usage, the widget estimates activity from your prompt history.
-
 This is different from your Claude account's usage page, which tracks billing across all Claude products. This widget only shows Claude Code CLI usage from your machine's local logs.
-
-## How it works
-
-```
-~/.claude/projects/**/*.jsonl  →  parser  →  JSON  →  <claude-token-heatmap>
-```
-
-The CLI scans your local Claude Code conversation logs, aggregates token usage by day/hour/month, and outputs a JSON file. The web component is a self-contained custom element that renders the data as a heatmap. Click any day to see an hourly breakdown.
 
 ## Privacy
 
-Everything runs on your machine. The CLI reads local files. The widget is a static web component. No data is sent anywhere.
+Only aggregated token counts are synced to the cloud — **no prompts, no code, no conversation content**. The sync uploads a small JSON file with daily/hourly token totals. Everything else stays on your machine.
 
 ## Requirements
 
-- Node.js 18+ (for the CLI)
+- Node.js 18+
 - Claude Code installed (creates `~/.claude/projects/`)
+- macOS for auto-sync (Linux users can use a cron job instead)
 
 ## License
 
