@@ -16,8 +16,6 @@ A GitHub-style contribution heatmap for your Claude Code token usage. Add it to 
 
 ## Quick start
 
-Three commands, then you're done forever:
-
 ```bash
 npx claude-count-tokens login              # 1. log in with GitHub
 npx claude-count-tokens sync               # 2. upload your token data
@@ -153,6 +151,21 @@ claude-token-heatmap {
   --cth-cell-l4: #6e9a56;
 }
 ```
+
+## Sizing
+
+The widget fills its container by default. To make it smaller or larger, use CSS:
+
+```css
+claude-token-heatmap {
+  max-width: 600px;    /* constrain overall width */
+  --cth-cell-s: 10px;  /* smaller cells (default 13px) */
+  --cth-cell-g: 2px;   /* tighter gaps (default 3px) */
+  --cth-cell-r: 2px;   /* border radius (default 3px) */
+}
+```
+
+The widget automatically shrinks on screens narrower than 700px.
 
 ## Live dashboard
 

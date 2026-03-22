@@ -26,89 +26,102 @@ export async function login() {
     const server = createServer(async (req, res) => {
       const url = new URL(req.url, `http://localhost`);
 
-      if (url.pathname !== '/callback') {
-        res.writeHead(404);
-        res.end();
-        return;
-      }
-
-      const code = url.searchParams.get('code');
-      if (!code) {
-        res.writeHead(400);
-        res.end('Missing auth code');
-        server.close();
-        reject(new Error('No auth code received'));
-        return;
-      }
-
-      try {
-        // Exchange the code for a session
-        const tokenRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=authorization_code`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({ code }),
-        });
-
-        if (!tokenRes.ok) {
-          const err = await tokenRes.text();
-          throw new Error(`Token exchange failed: ${err}`);
-        }
-
-        const session = await tokenRes.json();
-
-        // Get user profile (GitHub username)
-        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': SUPABASE_ANON_KEY,
-          },
-        });
-
-        if (!userRes.ok) throw new Error('Failed to fetch user profile');
-        const user = await userRes.json();
-
-        const username = user.user_metadata?.user_name
-          || user.user_metadata?.preferred_username
-          || user.email?.split('@')[0]
-          || 'unknown';
-
-        // Save config locally
-        await saveConfig({
-          supabaseAccessToken: session.access_token,
-          supabaseRefreshToken: session.refresh_token,
-          username,
-          userId: user.id,
-        });
-
-        // Send success page to browser
+      // Step 1: Supabase redirects here with tokens in the URL fragment (#access_token=...).
+      // Fragments are browser-only and never reach the server, so we serve a small
+      // HTML page that reads the fragment and POSTs it back to /callback/finish.
+      if (url.pathname === '/callback') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(`
           <html>
             <body style="font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #fafafa;">
               <div style="text-align: center;">
-                <h1 style="color: #333;">&#10003; Logged in!</h1>
-                <p style="color: #666;">You can close this window and return to your terminal.</p>
+                <p style="color: #666;">Completing login...</p>
               </div>
             </body>
+            <script>
+              const params = new URLSearchParams(location.hash.substring(1));
+              fetch('/callback/finish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(params)),
+              })
+              .then(r => r.json())
+              .then(data => {
+                document.querySelector('div').innerHTML =
+                  '<h1 style="color: #333;">&#10003; Logged in!</h1>' +
+                  '<p style="color: #666;">You can close this window and return to your terminal.</p>';
+              })
+              .catch(() => {
+                document.querySelector('div').innerHTML =
+                  '<h1 style="color: #c00;">Login failed</h1>' +
+                  '<p style="color: #666;">Check your terminal for details.</p>';
+              });
+            </script>
           </html>
         `);
-
-        server.close();
-
-        console.log(`\n  ✓ Logged in as ${username}\n`);
-        console.log(`  Your widget embed:`);
-        console.log(`  <claude-token-heatmap user="${username}" palette="spring">\n`);
-
-        resolve({ username, userId: user.id });
-      } catch (err) {
-        res.writeHead(500);
-        res.end('Authentication failed');
-        server.close();
-        reject(err);
+        return;
       }
+
+      // Step 2: Receive the tokens forwarded from the browser.
+      if (url.pathname === '/callback/finish' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const tokens = JSON.parse(body);
+            const accessToken = tokens.access_token;
+            const refreshToken = tokens.refresh_token;
+
+            if (!accessToken) {
+              throw new Error('No access_token in callback');
+            }
+
+            // Get user profile (GitHub username)
+            const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'apikey': SUPABASE_ANON_KEY,
+              },
+            });
+
+            if (!userRes.ok) throw new Error('Failed to fetch user profile');
+            const user = await userRes.json();
+
+            const username = user.user_metadata?.user_name
+              || user.user_metadata?.preferred_username
+              || user.email?.split('@')[0]
+              || 'unknown';
+
+            // Save config locally
+            await saveConfig({
+              supabaseAccessToken: accessToken,
+              supabaseRefreshToken: refreshToken,
+              username,
+              userId: user.id,
+            });
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, username }));
+
+            server.close();
+
+            console.log(`\n  ✓ Logged in as ${username}\n`);
+            console.log(`  Your widget embed:`);
+            console.log(`  <claude-token-heatmap user="${username}" palette="spring">\n`);
+
+            resolve({ username, userId: user.id });
+          } catch (err) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+            server.close();
+            reject(err);
+          }
+        });
+        return;
+      }
+
+      res.writeHead(404);
+      res.end();
     });
 
     // Listen on random port

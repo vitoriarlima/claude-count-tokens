@@ -48,6 +48,7 @@ class ClaudeTokenHeatmap extends HTMLElement {
 
   disconnectedCallback() {
     if (this._themeObserver) this._themeObserver.disconnect();
+    if (this._lottieAnim) this._lottieAnim.destroy();
   }
 
   _watchHostTheme() {
@@ -203,14 +204,17 @@ class ClaudeTokenHeatmap extends HTMLElement {
 
           <footer class="cth-foot">
             <a class="cth-learn-link" href="javascript:void(0)">learn how we count tokens</a>
-            <div class="cth-legend">
-              <span class="cth-legend-txt">Less</span>
-              <div class="cth-cell" data-level="0"></div>
-              <div class="cth-cell" data-level="1"></div>
-              <div class="cth-cell" data-level="2"></div>
-              <div class="cth-cell" data-level="3"></div>
-              <div class="cth-cell" data-level="4"></div>
-              <span class="cth-legend-txt">More</span>
+            <div class="cth-foot-right">
+              <div class="cth-legend">
+                <span class="cth-legend-txt">Less</span>
+                <div class="cth-cell" data-level="0"></div>
+                <div class="cth-cell" data-level="1"></div>
+                <div class="cth-cell" data-level="2"></div>
+                <div class="cth-cell" data-level="3"></div>
+                <div class="cth-cell" data-level="4"></div>
+                <span class="cth-legend-txt">More</span>
+              </div>
+              <div class="cth-legend-sep"></div>
             </div>
           </footer>
 
@@ -248,7 +252,12 @@ class ClaudeTokenHeatmap extends HTMLElement {
           </div>
           <div class="cth-pop-hours"><span>12a</span><span>6a</span><span>12p</span><span>6p</span></div>
         </div>
-      </div>`;
+
+      </div>
+      <a class="cth-get-widget" href="https://vitorialima.com/claude-tokens-count-widget" target="_blank" rel="noopener">
+        <div class="cth-lottie-container"></div>
+        <span class="cth-get-widget-tooltip">get this widget for yourself!</span>
+      </a>`;
 
     this._attachEvents();
     this._positionMonthLabels();
@@ -377,6 +386,40 @@ class ClaudeTokenHeatmap extends HTMLElement {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { popover.hidden = true; infoPop.hidden = true; }
     });
+
+    // Lottie Claude logo animation
+    this._initLottie();
+  }
+
+  _initLottie() {
+    const container = this.shadowRoot.querySelector('.cth-lottie-container');
+    if (!container) return;
+
+    const load = (lottie) => {
+      if (this._lottieAnim) this._lottieAnim.destroy();
+      this._lottieAnim = lottie.loadAnimation({
+        container,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: 'https://blobs.vusercontent.net/blob/claude-logo-10826353-J65FQsg8yWGZwBHdkT33FmbyF6W3tv.json',
+      });
+    };
+
+    if (window.lottie) {
+      load(window.lottie);
+    } else if (!document.querySelector('script[data-cth-lottie]')) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js';
+      script.dataset.cthLottie = '1';
+      script.onload = () => load(window.lottie);
+      document.head.appendChild(script);
+    } else {
+      // Script is loading from another instance, wait for it
+      const check = setInterval(() => {
+        if (window.lottie) { clearInterval(check); load(window.lottie); }
+      }, 50);
+    }
   }
 
   _showPopover(cell, dateStr, tokens) {
@@ -698,6 +741,8 @@ class ClaudeTokenHeatmap extends HTMLElement {
 
       * { box-sizing: border-box; margin: 0; padding: 0; }
 
+      :host { position: relative; display: block; }
+
       .cth {
         background: var(--cth-bg);
         border: 1px solid var(--cth-border);
@@ -837,12 +882,54 @@ class ClaudeTokenHeatmap extends HTMLElement {
       /* Footer */
       .cth-foot { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding-left: 32px; }
 
+      .cth-foot-right { display: flex; align-items: center; gap: 16px; }
+
       .cth-legend { display: flex; align-items: center; gap: 4px; }
 
       .cth-legend-txt { font-size: 11px; color: var(--cth-text-muted); padding: 0 4px; }
 
       .cth-legend .cth-cell { width: 11px; height: 11px; cursor: default; }
       .cth-legend .cth-cell:hover { transform: none; box-shadow: none; }
+
+      .cth-legend-sep { width: 0; }
+
+      .cth-get-widget {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        text-decoration: none;
+        z-index: 10;
+        pointer-events: none;
+      }
+      .cth-lottie-container {
+        width: 147px; height: 147px;
+        opacity: 0.4; transition: opacity 0.25s;
+        pointer-events: auto;
+        transform: translate(18%, 25%);
+      }
+      .cth-lottie-container:hover { opacity: 1; }
+      .cth-get-widget-tooltip {
+        position: absolute;
+        bottom: 35%;
+        right: 35%;
+        font-size: 10px;
+        color: var(--cth-text);
+        background: var(--cth-pop-bg);
+        padding: 5px 10px;
+        border-radius: 6px;
+        white-space: nowrap;
+        letter-spacing: 0.02em;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+        font-family: var(--cth-font);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        border: 1px solid var(--cth-border);
+      }
+      .cth-lottie-container:hover ~ .cth-get-widget-tooltip { opacity: 1; }
 
       /* Popover */
       .cth-popover {
