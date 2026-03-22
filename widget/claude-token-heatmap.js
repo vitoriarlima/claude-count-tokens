@@ -1112,7 +1112,7 @@ class ClaudeTokenHeatmap extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 12px 0 4px;
+        padding: 16px 0 0;
         gap: 8px;
       }
 
