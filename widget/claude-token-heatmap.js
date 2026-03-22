@@ -254,7 +254,7 @@ class ClaudeTokenHeatmap extends HTMLElement {
         </div>
 
       </div>
-      <a class="cth-get-widget" href="https://vitorialima.com/claude-tokens-count-widget" target="_blank" rel="noopener">
+      <a class="cth-get-widget" href="https://vitorialima.com/claude-code-tokens.html" target="_blank" rel="noopener">
         <div class="cth-lottie-container"></div>
         <span class="cth-get-widget-tooltip">get this widget for yourself!</span>
       </a>`;
