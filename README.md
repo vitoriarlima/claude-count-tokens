@@ -167,6 +167,24 @@ claude-token-heatmap {
 
 The widget automatically shrinks on screens narrower than 700px.
 
+## Promo link
+
+The widget includes a small animated link in the corner. To hide it:
+
+```html
+<claude-token-heatmap user="vitoria" promo="false"></claude-token-heatmap>
+```
+
+You can also style it from outside using `::part(promo-link)`:
+
+```css
+claude-token-heatmap::part(promo-link) {
+  opacity: 0.2;
+}
+```
+
+On mobile, the link automatically moves to the top-right to avoid overlapping the legend.
+
 ## Live dashboard
 
 Want to see your usage locally while you code?

@@ -9,7 +9,7 @@ class ClaudeTokenHeatmap extends HTMLElement {
   // Supabase Storage public URL — replace with your project's URL
   static SUPABASE_STORAGE_URL = 'https://huppfkdgepvwvucrjdaa.supabase.co/storage/v1/object/public/token-data';
 
-  static get observedAttributes() { return ['src', 'user', 'theme', 'locale', 'palette']; }
+  static get observedAttributes() { return ['src', 'user', 'theme', 'locale', 'palette', 'promo']; }
 
   static PALETTES = {
     fern:        ['#dbe8d0', '#b6d4a0', '#8bba76', '#629e4e'],
@@ -254,10 +254,10 @@ class ClaudeTokenHeatmap extends HTMLElement {
         </div>
 
       </div>
-      <a class="cth-get-widget" href="https://vitorialima.com/claude-code-tokens.html" target="_blank" rel="noopener">
+      ${this.getAttribute('promo') === 'false' ? '' : `<a class="cth-get-widget" part="promo-link" href="https://vitorialima.com/claude-code-tokens.html" target="_blank" rel="noopener">
         <div class="cth-lottie-container"></div>
         <span class="cth-get-widget-tooltip">get this widget for yourself!</span>
-      </a>`;
+      </a>`}`;
 
     this._attachEvents();
     this._positionMonthLabels();
@@ -387,6 +387,7 @@ class ClaudeTokenHeatmap extends HTMLElement {
   }
 
   _initLottie() {
+    if (this.getAttribute('promo') === 'false') return;
     const container = this.shadowRoot.querySelector('.cth-lottie-container');
     if (!container) return;
 
@@ -1247,6 +1248,8 @@ class ClaudeTokenHeatmap extends HTMLElement {
         .cth-stats { justify-content: flex-start; }
         .cth-stat { align-items: flex-start; }
         :host { --cth-cell-s: 10px; --cth-cell-g: 2px; }
+        .cth-get-widget { bottom: auto; top: 0; right: 0; }
+        .cth-lottie-container { width: 80px; height: 80px; transform: translate(18%, -25%); }
       }
     `;
   }
