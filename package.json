@@ -1,6 +1,6 @@
 {
   "name": "claude-count-tokens",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "GitHub-style heatmap widget showing your Claude Code token usage. One command to run, one line to embed.",
   "type": "module",
   "bin": {
