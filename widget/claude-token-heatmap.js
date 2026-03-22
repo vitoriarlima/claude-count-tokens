@@ -326,13 +326,8 @@ class ClaudeTokenHeatmap extends HTMLElement {
 
     const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     let mHTML = '';
-    let lastLabelCol = -4;
-    for (const [mk, ci] of monthPos) {
-      if (ci - lastLabelCol < 3) continue;
-      const mi = parseInt(mk.split('-')[1], 10) - 1;
-      // Use percentage-based positioning so labels scale with grid
-      mHTML += `<span class="cth-month-lbl" data-col="${ci}">${mNames[mi]}</span>`;
-      lastLabelCol = ci;
+    for (let mi = 0; mi < 12; mi++) {
+      mHTML += `<span class="cth-month-lbl" data-col="${mi}">${mNames[mi]}</span>`;
     }
 
     return { gridHTML: cells, monthLabelsHTML: mHTML, totalCols: col };
@@ -617,17 +612,29 @@ class ClaudeTokenHeatmap extends HTMLElement {
     const grid = this.shadowRoot.querySelector('.cth-grid');
     const months = this.shadowRoot.querySelector('.cth-months');
     if (!grid || !months) return;
-    const cols = grid.querySelectorAll('.cth-col');
     const labels = months.querySelectorAll('.cth-month-lbl');
-    const gridRect = grid.getBoundingClientRect();
+    const gridWidth = grid.getBoundingClientRect().width;
     const daysWidth = this.shadowRoot.querySelector('.cth-days')?.getBoundingClientRect().width || 32;
 
+    // Fixed positions: each month at a consistent percentage of the grid width
+    // based on day-of-year / 365, so labels never shift between years
+    const monthDayOffsets = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
     labels.forEach(lbl => {
-      const colIdx = parseInt(lbl.dataset.col, 10);
-      const colEl = cols[colIdx];
-      if (!colEl) return;
-      const colRect = colEl.getBoundingClientRect();
-      lbl.style.left = (colRect.left - gridRect.left + daysWidth + 4) + 'px';
+      const mi = parseInt(lbl.dataset.col, 10); // reuse data-col to store month index
+      // Fall back to column-based if data-col is a column index (> 11)
+      if (mi > 11) {
+        // Legacy: position from column
+        const cols = grid.querySelectorAll('.cth-col');
+        const colEl = cols[mi];
+        if (!colEl) return;
+        const colRect = colEl.getBoundingClientRect();
+        const gridRect = grid.getBoundingClientRect();
+        lbl.style.left = (colRect.left - gridRect.left + daysWidth + 4) + 'px';
+        return;
+      }
+      const pct = monthDayOffsets[mi] / 365;
+      lbl.style.left = (pct * gridWidth + daysWidth + 4) + 'px';
     });
   }
 
