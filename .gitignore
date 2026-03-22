@@ -3,3 +3,5 @@ claude-token-data.json
 .DS_Store
 .mcp.json
 SETUP-DEV.md
+page/
+.playwright-mcp/
