@@ -19,8 +19,9 @@ export async function installDaemon() {
     process.exit(1);
   }
 
-  // Find the npx path
+  // Find the npx path and node's bin directory (needed for launchd PATH)
   const npxPath = findNpx();
+  const nodeBinDir = findNodeBinDir();
 
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -28,6 +29,11 @@ export async function installDaemon() {
 <dict>
   <key>Label</key>
   <string>${LABEL}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${nodeBinDir}:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>${npxPath}</string>
@@ -99,5 +105,14 @@ function findNpx() {
     return execSync('which npx', { encoding: 'utf-8' }).trim();
   } catch {
     return '/usr/local/bin/npx';
+  }
+}
+
+function findNodeBinDir() {
+  try {
+    const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
+    return join(nodePath, '..');
+  } catch {
+    return '/usr/local/bin';
   }
 }

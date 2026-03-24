@@ -33,8 +33,9 @@ export async function sync(options = {}) {
 
   let res = await uploadToStorage(supabaseAccessToken, username, data);
 
-  // If 401, try refreshing the token
-  if (res.status === 401 && supabaseRefreshToken) {
+  // If auth fails, try refreshing the token
+  // Supabase Storage returns HTTP 400 with body statusCode 403 for expired JWTs
+  if (!res.ok && supabaseRefreshToken) {
     console.log('  Token expired, refreshing...');
     const newSession = await refreshSession(supabaseRefreshToken);
     if (newSession) {
