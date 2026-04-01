@@ -4,15 +4,15 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { stat } from 'node:fs/promises';
 
-// Claude Code was officially released Feb 24, 2025
 const CLAUDE_CODE_LAUNCH = new Date('2025-02-24');
 
-/**
- * Parse JSONL log files and history.jsonl for token usage + activity data.
- */
 export async function parseLogFiles(filePaths, daysBack = 3650) {
+  const { dailyMap, hourlyMap, monthlyMap, modelMap, now, cutoff } = await parseLogFilesRaw(filePaths, daysBack);
+  return buildOutput(now, cutoff, dailyMap, hourlyMap, monthlyMap, modelMap);
+}
+
+export async function parseLogFilesRaw(filePaths, daysBack = 3650) {
   const now = new Date();
-  // Never go before Claude Code launch date
   const cutoffByDays = new Date(now.getTime() - daysBack * 86400000);
   const cutoff = cutoffByDays > CLAUDE_CODE_LAUNCH ? cutoffByDays : CLAUDE_CODE_LAUNCH;
   const seenUuids = new Set();
@@ -22,20 +22,44 @@ export async function parseLogFiles(filePaths, daysBack = 3650) {
   const monthlyMap = new Map();
   const modelMap = new Map();
 
-  // Parse conversation JSONL files (has token usage)
   for (const filePath of filePaths) {
     await parseConversationFile(filePath, cutoff, seenUuids, dailyMap, hourlyMap, monthlyMap, modelMap);
   }
 
-  // Parse history.jsonl for activity on days without token data
-  // This captures older sessions that didn't record usage
   const historyPath = join(homedir(), '.claude', 'history.jsonl');
   const historyExists = await stat(historyPath).catch(() => null);
   if (historyExists?.isFile()) {
     await parseHistoryFile(historyPath, cutoff, dailyMap, hourlyMap, monthlyMap);
   }
 
-  return buildOutput(now, cutoff, dailyMap, hourlyMap, monthlyMap, modelMap);
+  return { dailyMap, hourlyMap, monthlyMap, modelMap, now, cutoff };
+}
+
+export function mergeMaps(mapsA, mapsB) {
+  const dailyMap = new Map(mapsA.dailyMap);
+  const hourlyMap = new Map(mapsA.hourlyMap);
+  const monthlyMap = new Map(mapsA.monthlyMap);
+  const modelMap = new Map(mapsA.modelMap);
+
+  for (const [dateStr, data] of mapsB.dailyMap) {
+    addToDaily(dailyMap, dateStr, data.tokens, data.inputTokens, data.outputTokens, data.cacheCreationTokens, data.cacheReadTokens);
+  }
+
+  for (const [dateStr, hours] of mapsB.hourlyMap) {
+    if (!hourlyMap.has(dateStr)) hourlyMap.set(dateStr, new Array(24).fill(0));
+    const target = hourlyMap.get(dateStr);
+    for (let i = 0; i < 24; i++) target[i] += hours[i] || 0;
+  }
+
+  for (const [monthStr, data] of mapsB.monthlyMap) {
+    addToMonthly(monthlyMap, monthStr, data.tokens, data.inputTokens, data.outputTokens, data.cacheCreationTokens, data.cacheReadTokens);
+  }
+
+  for (const [model, tokens] of mapsB.modelMap) {
+    modelMap.set(model, (modelMap.get(model) || 0) + tokens);
+  }
+
+  return { dailyMap, hourlyMap, monthlyMap, modelMap };
 }
 
 async function parseConversationFile(filePath, cutoff, seenUuids, dailyMap, hourlyMap, monthlyMap, modelMap) {
@@ -98,7 +122,6 @@ async function parseHistoryFile(filePath, cutoff, dailyMap, hourlyMap, monthlyMa
 
     if (!entry.timestamp) continue;
 
-    // history.jsonl uses epoch milliseconds
     const ts = new Date(typeof entry.timestamp === 'number' ? entry.timestamp : entry.timestamp);
     if (isNaN(ts.getTime())) continue;
     if (ts < cutoff) continue;
@@ -107,7 +130,6 @@ async function parseHistoryFile(filePath, cutoff, dailyMap, hourlyMap, monthlyMa
     const hour = localHour(ts);
     const monthStr = dateStr.slice(0, 7);
 
-    // Only add estimated activity for days that DON'T already have real token data
     if (dailyMap.has(dateStr) && dailyMap.get(dateStr).tokens > ESTIMATED_TOKENS_PER_PROMPT * 10) continue;
 
     addToDaily(dailyMap, dateStr, ESTIMATED_TOKENS_PER_PROMPT, ESTIMATED_TOKENS_PER_PROMPT, 0, 0, 0);
@@ -116,7 +138,7 @@ async function parseHistoryFile(filePath, cutoff, dailyMap, hourlyMap, monthlyMa
   }
 }
 
-function addToDaily(map, dateStr, tokens, input, output, cacheCreate, cacheRead) {
+export function addToDaily(map, dateStr, tokens, input, output, cacheCreate, cacheRead) {
   const day = map.get(dateStr) || { tokens: 0, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
   day.tokens += tokens;
   day.inputTokens += input;
@@ -126,12 +148,12 @@ function addToDaily(map, dateStr, tokens, input, output, cacheCreate, cacheRead)
   map.set(dateStr, day);
 }
 
-function addToHourly(map, dateStr, hour, tokens) {
+export function addToHourly(map, dateStr, hour, tokens) {
   if (!map.has(dateStr)) map.set(dateStr, new Array(24).fill(0));
   map.get(dateStr)[hour] += tokens;
 }
 
-function addToMonthly(map, monthStr, tokens, input, output, cacheCreate, cacheRead) {
+export function addToMonthly(map, monthStr, tokens, input, output, cacheCreate, cacheRead) {
   const m = map.get(monthStr) || { tokens: 0, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
   m.tokens += tokens;
   m.inputTokens += input;
@@ -141,7 +163,7 @@ function addToMonthly(map, monthStr, tokens, input, output, cacheCreate, cacheRe
   map.set(monthStr, m);
 }
 
-function buildOutput(now, cutoff, dailyMap, hourlyMap, monthlyMap, modelMap) {
+export function buildOutput(now, cutoff, dailyMap, hourlyMap, monthlyMap, modelMap) {
   const endDate = localDateString(now);
   const startDate = localDateString(cutoff);
 
@@ -180,13 +202,13 @@ function buildOutput(now, cutoff, dailyMap, hourlyMap, monthlyMap, modelMap) {
   };
 }
 
-function localDateString(date) {
+export function localDateString(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-function localHour(date) {
+export function localHour(date) {
   return date.getHours();
 }

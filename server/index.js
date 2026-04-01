@@ -5,8 +5,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { discoverLogFiles } from './discovery.js';
-import { parseLogFiles } from './parser.js';
-import { createWatcher } from './watcher.js';
+import { parseLogFilesRaw, buildOutput, mergeMaps } from './parser.js';
+import { createWatcher, createFileWatcher } from './watcher.js';
+import { parseZedThreads, getZedThreadsDbPath } from './zed-parser.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -71,8 +72,10 @@ const sseClients = new Set();
 
 async function refreshData() {
   const files = await discoverLogFiles(projectsDir, projectFilter);
-  currentData = await parseLogFiles(files, days);
-  // Notify all SSE clients
+  const claudeMaps = await parseLogFilesRaw(files, days);
+  const zedMaps = await parseZedThreads(days);
+  const merged = mergeMaps(claudeMaps, zedMaps);
+  currentData = buildOutput(claudeMaps.now, claudeMaps.cutoff, merged.dailyMap, merged.hourlyMap, merged.monthlyMap, merged.modelMap);
   for (const res of sseClients) {
     res.write(`data: updated\n\n`);
   }
@@ -132,7 +135,7 @@ const server = createServer(async (req, res) => {
 });
 
 // Initial parse
-console.log('Parsing Claude Code logs...');
+console.log('Parsing token data...');
 await refreshData();
 
 const totalTokens = currentData.summary.totalTokens;
@@ -140,28 +143,33 @@ const totalDays = currentData.summary.totalDays;
 console.log(`Found ${formatTokens(totalTokens)} tokens across ${totalDays} days`);
 
 // Start watcher
-const watcher = createWatcher(async () => {
-  console.log('Log changes detected, refreshing...');
+const onDataChange = async () => {
+  console.log('Changes detected, refreshing...');
   await refreshData();
-}, projectsDir);
+};
+
+const watcher = createWatcher(onDataChange, projectsDir);
+const zedWatcher = createFileWatcher(getZedThreadsDbPath(), onDataChange);
 
 // Start server
 server.listen(port, () => {
   console.log(`\n  claude-count-tokens is running\n`);
   console.log(`  Dashboard:  http://localhost:${port}`);
   console.log(`  API:        http://localhost:${port}/api/data`);
-  console.log(`  Live:       watching ~/.claude/projects/ for changes\n`);
+  console.log(`  Live:       watching for changes\n`);
 });
 
 // Cleanup on exit
 process.on('SIGINT', () => {
   watcher.close();
+  zedWatcher.close();
   server.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   watcher.close();
+  zedWatcher.close();
   server.close();
   process.exit(0);
 });
