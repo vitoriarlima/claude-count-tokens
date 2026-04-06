@@ -35,3 +35,31 @@ export function createWatcher(onChange, baseDir) {
     }
   };
 }
+
+export function createFileWatcher(filePath, onChange) {
+  if (!filePath) return { close() {} };
+
+  let debounceTimer = null;
+  const DEBOUNCE_MS = 3000;
+
+  let watcher;
+  try {
+    watcher = watch(filePath, (eventType) => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        onChange();
+      }, DEBOUNCE_MS);
+    });
+  } catch {
+    return { close() {} };
+  }
+
+  watcher.on('error', () => {});
+
+  return {
+    close() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      watcher.close();
+    }
+  };
+}

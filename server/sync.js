@@ -2,7 +2,8 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './constants.js';
 import { getConfig, saveConfig } from './config.js';
 import { refreshSession } from './auth.js';
 import { discoverLogFiles } from './discovery.js';
-import { parseLogFiles } from './parser.js';
+import { parseLogFilesRaw, buildOutput, mergeMaps } from './parser.js';
+import { parseZedThreads } from './zed-parser.js';
 
 /**
  * Sync token data to Supabase Storage.
@@ -20,9 +21,12 @@ export async function sync(options = {}) {
 
   // 2. Parse local logs
   const { days = 3650, projectsDir = null, projectFilter = null } = options;
-  console.log('  Parsing local Claude Code logs...');
+  console.log('  Parsing local token data...');
   const files = await discoverLogFiles(projectsDir, projectFilter);
-  const data = await parseLogFiles(files, days);
+  const claudeMaps = await parseLogFilesRaw(files, days);
+  const zedMaps = await parseZedThreads(days);
+  const merged = mergeMaps(claudeMaps, zedMaps);
+  const data = buildOutput(claudeMaps.now, claudeMaps.cutoff, merged.dailyMap, merged.hourlyMap, merged.monthlyMap, merged.modelMap);
 
   const totalTokens = data.summary.totalTokens;
   const totalDays = data.summary.totalDays;
